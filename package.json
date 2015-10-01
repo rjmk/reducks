@@ -4,6 +4,7 @@
   "description": "An example of using redux with react.js",
   "main": "index.js",
   "scripts": {
+    "start": "watchify --extension=js -o bundle.js index.js & python -m SimpleHTTPServer",
     "test": "test"
   },
   "repository": {
@@ -14,6 +15,11 @@
   "license": "ISC",
   "bugs": {
     "url": "https://github.com/rjmk/reducks/issues"
+  },
+  "browserify": {
+    "transform": [
+      "babelify"
+    ]
   },
   "dependencies": {
     "react": "^0.14.0-rc1",
