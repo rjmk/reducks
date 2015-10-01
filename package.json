@@ -1,0 +1,30 @@
+{
+  "name": "reducks",
+  "version": "0.0.0",
+  "description": "An example of using redux with react.js",
+  "main": "index.js",
+  "scripts": {
+    "test": "test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rjmk/reducks.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/rjmk/reducks/issues"
+  },
+  "dependencies": {
+    "react": "^0.14.0-rc1",
+    "react-dom": "^0.14.0-rc1",
+    "react-redux": "^3.0.1",
+    "redux": "^3.0.2"
+  },
+  "devDependencies": {
+    "babelify": "~6.1.2",
+    "browserify": "~10.2.4",
+    "tape": "^4.2.0",
+    "watchify": "^3.3.1"
+  }
+}
