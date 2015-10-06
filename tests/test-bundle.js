@@ -4,21 +4,48 @@
 Object.defineProperty(exports, '__esModule', {
   value: true
 });
-var append = function append(character) {
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { 'default': obj }; }
+
+var _xhr = require('xhr');
+
+var _xhr2 = _interopRequireDefault(_xhr);
+
+var append = function append(gif) {
   return {
-    type: 'append', character: character
+    type: 'append', gif: gif
   };
 };
 
-exports.append = append;
 var del = function del() {
   return {
     type: 'delete'
   };
 };
-exports.del = del;
 
-},{}],2:[function(require,module,exports){
+exports.del = del;
+var getData = function getData(gif) {
+  return function (dispatch) {
+    return (0, _xhr2['default'])({ method: 'GET', uri: gif }, function (err, res) {
+      var data = JSON.parse(res.body);
+      var gifUrl = data.data[0].images.fixed_height.url;
+      dispatch(append(gifUrl));
+    });
+  };
+};
+
+var getGiff = function getGiff(gif) {
+  var createUri = function createUri(gif) {
+    return 'http://api.giphy.com/v1/gifs/search?q=funny+' + gif + '&api_key=dc6zaTOxFJmzC';
+  };
+  return function (dispatch) {
+    var uri = createUri(gif);
+    return dispatch(getData(uri));
+  };
+};
+exports.getGiff = getGiff;
+
+},{"xhr":218}],2:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, '__esModule', {
@@ -34,14 +61,13 @@ var _react2 = _interopRequireDefault(_react);
 // PURE REACT
 
 exports['default'] = Text = function (props) {
+
   return _react2['default'].createElement(
     'div',
     null,
-    _react2['default'].createElement(
-      'p',
-      null,
-      props.display
-    ),
+    props.gifs.map(function (val, i) {
+      return _react2['default'].createElement('img', { key: i, src: val });
+    }),
     _react2['default'].createElement(
       'button',
       { onClick: props.del },
@@ -26933,6 +26959,344 @@ function base64DetectIncompleteChar(buffer) {
 }
 
 },{"buffer":193}],218:[function(require,module,exports){
+"use strict";
+var window = require("global/window")
+var once = require("once")
+var parseHeaders = require("parse-headers")
+
+
+
+module.exports = createXHR
+createXHR.XMLHttpRequest = window.XMLHttpRequest || noop
+createXHR.XDomainRequest = "withCredentials" in (new createXHR.XMLHttpRequest()) ? createXHR.XMLHttpRequest : window.XDomainRequest
+
+
+function isEmpty(obj){
+    for(var i in obj){
+        if(obj.hasOwnProperty(i)) return false
+    }
+    return true
+}
+
+function createXHR(options, callback) {
+    function readystatechange() {
+        if (xhr.readyState === 4) {
+            loadFunc()
+        }
+    }
+
+    function getBody() {
+        // Chrome with requestType=blob throws errors arround when even testing access to responseText
+        var body = undefined
+
+        if (xhr.response) {
+            body = xhr.response
+        } else if (xhr.responseType === "text" || !xhr.responseType) {
+            body = xhr.responseText || xhr.responseXML
+        }
+
+        if (isJson) {
+            try {
+                body = JSON.parse(body)
+            } catch (e) {}
+        }
+
+        return body
+    }
+
+    var failureResponse = {
+                body: undefined,
+                headers: {},
+                statusCode: 0,
+                method: method,
+                url: uri,
+                rawRequest: xhr
+            }
+
+    function errorFunc(evt) {
+        clearTimeout(timeoutTimer)
+        if(!(evt instanceof Error)){
+            evt = new Error("" + (evt || "Unknown XMLHttpRequest Error") )
+        }
+        evt.statusCode = 0
+        callback(evt, failureResponse)
+    }
+
+    // will load the data & process the response in a special response object
+    function loadFunc() {
+        if (aborted) return
+        var status
+        clearTimeout(timeoutTimer)
+        if(options.useXDR && xhr.status===undefined) {
+            //IE8 CORS GET successful response doesn't have a status field, but body is fine
+            status = 200
+        } else {
+            status = (xhr.status === 1223 ? 204 : xhr.status)
+        }
+        var response = failureResponse
+        var err = null
+
+        if (status !== 0){
+            response = {
+                body: getBody(),
+                statusCode: status,
+                method: method,
+                headers: {},
+                url: uri,
+                rawRequest: xhr
+            }
+            if(xhr.getAllResponseHeaders){ //remember xhr can in fact be XDR for CORS in IE
+                response.headers = parseHeaders(xhr.getAllResponseHeaders())
+            }
+        } else {
+            err = new Error("Internal XMLHttpRequest Error")
+        }
+        callback(err, response, response.body)
+
+    }
+
+    if (typeof options === "string") {
+        options = { uri: options }
+    }
+
+    options = options || {}
+    if(typeof callback === "undefined"){
+        throw new Error("callback argument missing")
+    }
+    callback = once(callback)
+
+    var xhr = options.xhr || null
+
+    if (!xhr) {
+        if (options.cors || options.useXDR) {
+            xhr = new createXHR.XDomainRequest()
+        }else{
+            xhr = new createXHR.XMLHttpRequest()
+        }
+    }
+
+    var key
+    var aborted
+    var uri = xhr.url = options.uri || options.url
+    var method = xhr.method = options.method || "GET"
+    var body = options.body || options.data
+    var headers = xhr.headers = options.headers || {}
+    var sync = !!options.sync
+    var isJson = false
+    var timeoutTimer
+
+    if ("json" in options) {
+        isJson = true
+        headers["accept"] || headers["Accept"] || (headers["Accept"] = "application/json") //Don't override existing accept header declared by user
+        if (method !== "GET" && method !== "HEAD") {
+            headers["content-type"] || headers["Content-Type"] || (headers["Content-Type"] = "application/json") //Don't override existing accept header declared by user
+            body = JSON.stringify(options.json)
+        }
+    }
+
+    xhr.onreadystatechange = readystatechange
+    xhr.onload = loadFunc
+    xhr.onerror = errorFunc
+    // IE9 must have onprogress be set to a unique function.
+    xhr.onprogress = function () {
+        // IE must die
+    }
+    xhr.ontimeout = errorFunc
+    xhr.open(method, uri, !sync, options.username, options.password)
+    //has to be after open
+    if(!sync) {
+        xhr.withCredentials = !!options.withCredentials
+    }
+    // Cannot set timeout with sync request
+    // not setting timeout on the xhr object, because of old webkits etc. not handling that correctly
+    // both npm's request and jquery 1.x use this kind of timeout, so this is being consistent
+    if (!sync && options.timeout > 0 ) {
+        timeoutTimer = setTimeout(function(){
+            aborted=true//IE9 may still call readystatechange
+            xhr.abort("timeout")
+            var e = new Error("XMLHttpRequest timeout")
+            e.code = "ETIMEDOUT"
+            errorFunc(e)
+        }, options.timeout )
+    }
+
+    if (xhr.setRequestHeader) {
+        for(key in headers){
+            if(headers.hasOwnProperty(key)){
+                xhr.setRequestHeader(key, headers[key])
+            }
+        }
+    } else if (options.headers && !isEmpty(options.headers)) {
+        throw new Error("Headers cannot be set on an XDomainRequest object")
+    }
+
+    if ("responseType" in options) {
+        xhr.responseType = options.responseType
+    }
+
+    if ("beforeSend" in options &&
+        typeof options.beforeSend === "function"
+    ) {
+        options.beforeSend(xhr)
+    }
+
+    xhr.send(body)
+
+    return xhr
+
+
+}
+
+function noop() {}
+
+},{"global/window":219,"once":220,"parse-headers":224}],219:[function(require,module,exports){
+(function (global){
+if (typeof window !== "undefined") {
+    module.exports = window;
+} else if (typeof global !== "undefined") {
+    module.exports = global;
+} else if (typeof self !== "undefined"){
+    module.exports = self;
+} else {
+    module.exports = {};
+}
+
+}).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
+},{}],220:[function(require,module,exports){
+module.exports = once
+
+once.proto = once(function () {
+  Object.defineProperty(Function.prototype, 'once', {
+    value: function () {
+      return once(this)
+    },
+    configurable: true
+  })
+})
+
+function once (fn) {
+  var called = false
+  return function () {
+    if (called) return
+    called = true
+    return fn.apply(this, arguments)
+  }
+}
+
+},{}],221:[function(require,module,exports){
+var isFunction = require('is-function')
+
+module.exports = forEach
+
+var toString = Object.prototype.toString
+var hasOwnProperty = Object.prototype.hasOwnProperty
+
+function forEach(list, iterator, context) {
+    if (!isFunction(iterator)) {
+        throw new TypeError('iterator must be a function')
+    }
+
+    if (arguments.length < 3) {
+        context = this
+    }
+    
+    if (toString.call(list) === '[object Array]')
+        forEachArray(list, iterator, context)
+    else if (typeof list === 'string')
+        forEachString(list, iterator, context)
+    else
+        forEachObject(list, iterator, context)
+}
+
+function forEachArray(array, iterator, context) {
+    for (var i = 0, len = array.length; i < len; i++) {
+        if (hasOwnProperty.call(array, i)) {
+            iterator.call(context, array[i], i, array)
+        }
+    }
+}
+
+function forEachString(string, iterator, context) {
+    for (var i = 0, len = string.length; i < len; i++) {
+        // no such thing as a sparse string.
+        iterator.call(context, string.charAt(i), i, string)
+    }
+}
+
+function forEachObject(object, iterator, context) {
+    for (var k in object) {
+        if (hasOwnProperty.call(object, k)) {
+            iterator.call(context, object[k], k, object)
+        }
+    }
+}
+
+},{"is-function":222}],222:[function(require,module,exports){
+module.exports = isFunction
+
+var toString = Object.prototype.toString
+
+function isFunction (fn) {
+  var string = toString.call(fn)
+  return string === '[object Function]' ||
+    (typeof fn === 'function' && string !== '[object RegExp]') ||
+    (typeof window !== 'undefined' &&
+     // IE8 and below
+     (fn === window.setTimeout ||
+      fn === window.alert ||
+      fn === window.confirm ||
+      fn === window.prompt))
+};
+
+},{}],223:[function(require,module,exports){
+
+exports = module.exports = trim;
+
+function trim(str){
+  return str.replace(/^\s*|\s*$/g, '');
+}
+
+exports.left = function(str){
+  return str.replace(/^\s*/, '');
+};
+
+exports.right = function(str){
+  return str.replace(/\s*$/, '');
+};
+
+},{}],224:[function(require,module,exports){
+var trim = require('trim')
+  , forEach = require('for-each')
+  , isArray = function(arg) {
+      return Object.prototype.toString.call(arg) === '[object Array]';
+    }
+
+module.exports = function (headers) {
+  if (!headers)
+    return {}
+
+  var result = {}
+
+  forEach(
+      trim(headers).split('\n')
+    , function (row) {
+        var index = row.indexOf(':')
+          , key = trim(row.slice(0, index)).toLowerCase()
+          , value = trim(row.slice(index + 1))
+
+        if (typeof(result[key]) === 'undefined') {
+          result[key] = value
+        } else if (isArray(result[key])) {
+          result[key].push(value)
+        } else {
+          result[key] = [ result[key], value ]
+        }
+      }
+  )
+
+  return result
+}
+},{"for-each":221,"trim":223}],225:[function(require,module,exports){
 // PURE REDUX
 'use strict';
 
@@ -26941,13 +27305,13 @@ Object.defineProperty(exports, '__esModule', {
 });
 
 exports['default'] = function (state, action) {
-  if (state === undefined) state = '';
+  if (state === undefined) state = [];
 
   switch (action.type) {
     case 'append':
-      return state + action.character;
+      return state.concat(action.gif);
     case 'delete':
-      return state.split('').reverse().slice(1).reverse().join('');
+      return state.slice(0, -1);
     default:
       return state;
   }
@@ -26955,7 +27319,7 @@ exports['default'] = function (state, action) {
 
 module.exports = exports['default'];
 
-},{}],219:[function(require,module,exports){
+},{}],226:[function(require,module,exports){
 'use strict';
 
 function _interopRequireWildcard(obj) { if (obj && obj.__esModule) { return obj; } else { var newObj = {}; if (obj != null) { for (var key in obj) { if (Object.prototype.hasOwnProperty.call(obj, key)) newObj[key] = obj[key]; } } newObj['default'] = obj; return newObj; } }
@@ -26970,13 +27334,12 @@ var _actionsIndexJs = require('../../actions/index.js');
 
 var action = _interopRequireWildcard(_actionsIndexJs);
 
-(0, _tape2['default'])('Append action creator returns the correct character passed ro it', function (t) {
-
-	var expected = { type: 'append', character: 'a' };
-
-	t.deepEqual(action.append('a'), expected, 'append action correctly created');
-	t.end();
-});
+// test.only('Append action creator returns the correct character passed ro it', (t) => {
+//
+// 	const expected = { type: 'append', gif: 'cat'};
+// 	t.deepEqual(action.getGiff('d'), expected, 'append action correctly created');
+// 	t.end();
+// })
 
 (0, _tape2['default'])('Del action creator always returns the correct action', function (t) {
 
@@ -26986,7 +27349,7 @@ var action = _interopRequireWildcard(_actionsIndexJs);
 	t.end();
 });
 
-},{"../../actions/index.js":1,"tape":177}],220:[function(require,module,exports){
+},{"../../actions/index.js":1,"tape":177}],227:[function(require,module,exports){
 'use strict';
 
 var _slicedToArray = (function () { function sliceIterator(arr, i) { var _arr = []; var _n = true; var _d = false; var _e = undefined; try { for (var _i = arr[Symbol.iterator](), _s; !(_n = (_s = _i.next()).done); _n = true) { _arr.push(_s.value); if (i && _arr.length === i) break; } } catch (err) { _d = true; _e = err; } finally { try { if (!_n && _i['return']) _i['return'](); } finally { if (_d) throw _e; } } return _arr; } return function (arr, i) { if (Array.isArray(arr)) { return arr; } else if (Symbol.iterator in Object(arr)) { return sliceIterator(arr, i); } else { throw new TypeError('Invalid attempt to destructure non-iterable instance'); } }; })();
@@ -27069,7 +27432,7 @@ var setup = function setup() {
 	t.end();
 });
 
-},{"../../components/Text.js":2,"react/addons":3,"tape":177}],221:[function(require,module,exports){
+},{"../../components/Text.js":2,"react/addons":3,"tape":177}],228:[function(require,module,exports){
 'use strict';
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { 'default': obj }; }
@@ -27108,4 +27471,4 @@ var _reducersIndexJs2 = _interopRequireDefault(_reducersIndexJs);
 	t.end();
 });
 
-},{"../../reducers/index.js":218,"tape":177}]},{},[219,220,221]);
+},{"../../reducers/index.js":225,"tape":177}]},{},[226,227,228]);

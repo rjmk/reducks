@@ -5,15 +5,19 @@ import * as Actions from '../actions';
 // REACT-REDUX
 
 const mapStateToProps = state => {
+
   return {
-    display: state
-  }
+    gifs: state
+  };
 }
 
-const mapDispatchToProps = dispatch => { return {
+const mapDispatchToProps = dispatch => {
+
+    return {
     submitChar: () => {
+
       let val = document.querySelector('input').value;
-      dispatch(Actions.append(val));
+      dispatch( Actions.getGiff(val));
     },
     del: () => dispatch(Actions.del())
   }
